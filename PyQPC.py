@@ -22,8 +22,8 @@
 import argparse
 import os
 import sys
+from pathlib import Path
 
-import PyQPC_Base as base
 import PyQPC_Parser as parser
 import PyQPC_Writer as writer
 
@@ -100,6 +100,8 @@ def ParseArgs():
     cmd_parser = argparse.ArgumentParser("Turn VPC projects into VS projects")
 
     # maybe move handling command line parameters to different functions?
+    cmd_parser.add_argument('path', default=Path().absolute(),
+                            help='directory containing .vgc defs')
     cmd_parser.add_argument('-v', '--verbose', action='store_true')
     cmd_parser.add_argument('-l', '--legacyoptions', action='store_true')
     cmd_parser.add_argument('-w', '--hidewarnings', action='store_true')
@@ -131,12 +133,14 @@ if __name__ == "__main__":
     base_macros, base_conditionals = SetupDefines(parsed)
 
     # now start the recursion with default.vgc, which i just set to be in the same folder as this
-    base_macros["$ROOTDIR"] = os.getcwd() + os.sep
+    rootdir = parsed.path
 
     if parsed.verbose:
-        print("Reading: " + base_macros["$ROOTDIR"] + "default.vgc")
+        print("Reading: " + rootdir / "default.vgc")
 
-    base_file = parser.ReadFile(base_macros["$ROOTDIR"] + "default.vgc", **vars(parsed))
+    base_file = parser.ReadFile(rootdir / "default.vgc", **vars(parsed))
+
+    base_macros["$ROOTDIR"] = str(rootdir)
     definitions_file_path = parser.ParseBaseFile(base_file, base_macros, base_conditionals, parsed.conditionals,
                                                  all_projects, all_groups)
 
@@ -150,11 +154,8 @@ if __name__ == "__main__":
     if definitions_file_path:
         definitions_file = parser.ReadFile(definitions_file_path)
     else:
-        print("---------------------------------------------------------------------------------")
-        print("ERROR:  Definitions file needed for configuration options is undefined")
-        print("        Set this with $Definitions \"Path\" in default.vgc")
-        print("---------------------------------------------------------------------------------")
-        quit()
+        raise ValueError("Definitions file needed for configuration options is undefined" +
+                         "Set this with $Definitions \"Path\" in default.vgc")
 
     definitions = parser.ParseDefFile(definitions_file[0])
 
@@ -164,9 +165,6 @@ if __name__ == "__main__":
     add_proj_and_grps = parsed.add
     # RemovedProjectsOrGroups
     rm_proj_and_grps = parsed.remove
-
-    if rm_proj_and_grps == None:
-        rm_proj_and_grps = []
 
     # TODO: figure out how vpc handles these and recreate it here
     # might come waaay later since it's very low priority
@@ -179,7 +177,7 @@ if __name__ == "__main__":
     # actually should i make this contain the project name and the project script as a dictionary? like in VPC?
     project_script_list = []
 
-    if add_proj_and_grps != None:
+    if add_proj_and_grps:
         for added_item in add_proj_and_grps:
             if added_item in all_groups:
 
@@ -187,7 +185,7 @@ if __name__ == "__main__":
                     # if project isn't being removed
                     if (project.lower()) not in rm_proj_and_grps:
                         for script in all_projects[project.casefold()]:
-                            # only add if this project isn't empty AND it isn't in the project list already 
+                            # only add if this project isn't empty AND it isn't in the project list already
                             if (script != '') and (not script in project_script_list):
                                 project_script_list.append(script)
 
@@ -246,7 +244,7 @@ if __name__ == "__main__":
         project_path_list.append(project_path.rsplit(".", 1)[0])
 
     if parsed.type == 'vstudio':
-        writer.MakeSolutionFile(project_type, project_path_list, base_macros["$ROOTDIR"],
+        writer.MakeSolutionFile(project_type, project_path_list, rootdir,
                                 parsed.name)
 
     # would be cool to add a timer here that would be running on another thread
