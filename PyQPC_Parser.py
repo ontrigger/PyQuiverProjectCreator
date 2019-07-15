@@ -379,7 +379,7 @@ class ConfigOption:
 
 
 # maybe add a depth variable here as well? idk
-def ReadFile(path):
+def ReadFile(path, **kwargs):
     with open(path, mode="r", encoding="utf-8") as file:
         file = file.readlines()
     file = base.RemoveCommentsAndFixLines(file)

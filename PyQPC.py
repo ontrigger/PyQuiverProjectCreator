@@ -19,7 +19,7 @@
 #   07/13/2019
 #   07/14/2019
 # ---------------------------------------------------------------------
-
+import argparse
 import os
 import sys
 
@@ -104,30 +104,6 @@ if __name__ == "__main__":
     base_macrosRequired = {}
     base_conditionals = {}
 
-    # is this useless now that im just using base.FindCommand()?
-    # it might lead to some obscure command buried somewhere
-    # while this keeps it all here, but then you need to include it in a ton of functions
-    cmd_options = {
-        "verbose": False,
-        "showlegacyoptions": False,
-        "hidewarnings": False,
-        "mksln": False,
-        "checkfiles": False,
-    }
-
-    # this does nothing currently
-    cmd_help = [
-        "help",
-        "h",
-        "?",
-    ]
-
-    cmd_project_types = [
-        "vstudio",
-        # "vscode",
-        # "make",
-    ]
-
     unknown_conditionals = []
 
     all_groups = {}
@@ -138,30 +114,28 @@ if __name__ == "__main__":
     SetupOSDefines()
     SetupBaseDefines()  # remove this later
 
+    cmd_parser = argparse.ArgumentParser("Turn VPC projects into VS projects")
+
     # maybe move handling command line parameters to different functions?
+    cmd_parser.add_argument('-v', '--verbose', action='store_true')
+    cmd_parser.add_argument('-l', '--legacyoptions', action='store_true')
+    cmd_parser.add_argument('-w', '--hidewarnings', action='store_true')
+    cmd_parser.add_argument('-c', '--checkfiles', action='store_true')
+    cmd_parser.add_argument('--type', choices=["vstudio", "vscode", "make"])
+    cmd_parser.add_argument('conditionals', nargs='*', type=str)
+    cmd_parser.add_argument('--add', nargs='+', type=str)
+    cmd_parser.add_argument('--remove', nargs='+', type=str)
 
-    cmdline_conditionals = base.FindCommandValues("/")
-
-    if cmdline_conditionals:
-        for conditional in cmdline_conditionals:
-
-            if conditional in cmd_options:
-                cmd_options[conditional] = True
-
-            elif conditional in cmd_project_types:
-                project_type = conditional
-
-            else:
-                unknown_conditionals.append(conditional.upper())
+    parsed = cmd_parser.parse_args()
 
     # now start the recursion with default.vgc, which i just set to be in the same folder as this
     base_macros["$ROOTDIR"] = os.getcwd() + os.sep
 
-    if cmd_options["verbose"]:
+    if parsed.verbose:
         print("Reading: " + base_macros["$ROOTDIR"] + "default.vgc")
 
-    base_file = parser.ReadFile(base_macros["$ROOTDIR"] + "default.vgc")
-    definitions_file_path = parser.ParseBaseFile(base_file, base_macros, base_conditionals, unknown_conditionals,
+    base_file = parser.ReadFile(base_macros["$ROOTDIR"] + "default.vgc", **vars(parsed))
+    definitions_file_path = parser.ParseBaseFile(base_file, base_macros, base_conditionals, parsed.conditionals,
                                                  all_projects, all_groups)
 
     base_macros["$ROOTDIR"] = os.path.normpath(base_macros["$ROOTDIR"])
@@ -185,9 +159,9 @@ if __name__ == "__main__":
     # setup any defines from the command line for what projects and/or groups we want
 
     # AddedProjectsOrGroups
-    add_proj_and_grps = base.FindCommandValues("+")
+    add_proj_and_grps = parsed.add
     # RemovedProjectsOrGroups
-    rm_proj_and_grps = base.FindCommandValues("-")
+    rm_proj_and_grps = parsed.remove
 
     if rm_proj_and_grps == None:
         rm_proj_and_grps = []
