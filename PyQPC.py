@@ -28,60 +28,60 @@ import PyQPC_Parser as parser
 import PyQPC_Writer as writer
 
 
-def SetupOSDefines():
-    if sys.platform == "win32":
-        base_conditionals["$WINDOWS"] = 1
+def SetupDefines(parsed_cmds):
+    macros = {}
+    conditionals = {}
 
-        base_macros["$_DLL_EXT"] = ".dll"
-        base_macros["$_STATICLIB_EXT"] = ".lib"
-        base_macros["$_IMPLIB_EXT"] = ".lib"
-        base_macros["$_EXE_EXT"] = ".exe"
+    if sys.platform == "win32":
+        conditionals["$WINDOWS"] = 1
+        macros += {
+            "$_DLL_EXT": ".dll",
+            "$_STATICLIB_EXT": ".lib",
+            "$_IMPLIB_EXT": ".lib",
+            "$_EXE_EXT": ".exe"
+        }
 
         # for win64 just use /win64 from the commmand line for now
         # if you ever finish this pile of shit
         # change it so you can have x86 and x64 in the same project
-        if base.FindCommand("/win64"):
-            base_conditionals["$WIN64"] = 1
-            base_macros["$PLATFORM"] = "win64"
+        if parsed_cmds.platform == 'win64':
+            conditionals["$WIN64"] = 1
+            macros["$PLATFORM"] = "win64"
         else:
-            base_conditionals["$WIN32"] = 1
-            base_macros["$PLATFORM"] = "win32"
+            conditionals["$WIN32"] = 1
+            macros["$PLATFORM"] = "win32"
 
     # fix this, these are pretty much for linux only
     elif sys.platform.startswith('linux'):
-        base_conditionals["$POSIX"] = 1
-        base_conditionals["$LINUXALL"] = 1
+        conditionals += {
+            "$POSIX": 1,
+            "$LINUXALL": 1,
+            "$GL": 1
+        }
 
-        base_conditionals["$GL"] = 1
+        macros += {
+            "$POSIX": "1",
+            "$_POSIX": "1",
+            "$_DLL_EXT": ".so",
+            "$_EXTERNAL_DLL_EXT": ".so",
+            "$_STATICLIB_EXT": ".a",
+            "$_EXTERNAL_STATICLIB_EXT": ".a",
+            "$_IMPLIB_EXT": ".so",
+            "$_EXTERNAL_IMPLIB_EXT": ".so",
+            "$_IMPLIB_PREFIX": "lib",
+            "$_IMPLIB_DLL_PREFIX": "lib",
+            "$_EXE_EXT": "",
+            "$_SYM_EXT": ".dbg",
+        }
 
-        base_macros["$POSIX"] = "1"
-        base_macros["$_POSIX"] = "1"
-
-        base_macros["$_DLL_EXT"] = ".so"
-        base_macros["$_EXTERNAL_DLL_EXT"] = ".so"
-
-        base_macros["$_STATICLIB_EXT"] = ".a"
-        base_macros["$_EXTERNAL_STATICLIB_EXT"] = ".a"
-
-        base_macros["$_IMPLIB_EXT"] = ".so"
-        base_macros["$_EXTERNAL_IMPLIB_EXT"] = ".so"
-
-        base_macros["$_IMPLIB_PREFIX"] = "lib"
-        base_macros["$_IMPLIB_DLL_PREFIX"] = "lib"
-
-        base_macros["$_EXE_EXT"] = ""
-        base_macros["$_SYM_EXT"] = ".dbg"
-
-        if base.FindCommand("/linux64"):
-            base_conditionals["$POSIX64"] = 1
-            base_macros["$PLATFORM"] = "linux64"
+        if parsed_cmds.platform == 'linux64':
+            conditionals["$POSIX64"] = 1
+            macros["$PLATFORM"] = "linux64"
         else:
-            base_conditionals["$POSIX32"] = 1
-            base_macros["$PLATFORM"] = "linux32"
+            conditionals["$POSIX32"] = 1
+            macros["$PLATFORM"] = "linux32"
 
-
-def SetupBaseDefines():
-    base_macros["$QUOTE"] = '"'
+    macros["$QUOTE"] = '"'
     # base_macros[ "$BASE" ] = ''
 
     # idk what this does, though in vpc it apparently forces all projects to regenerate if you change it
@@ -90,30 +90,13 @@ def SetupBaseDefines():
     # base_conditionals[ "$InternalVersion" ] = 104
 
     # also apparently a macro doesn't need to be in caps? ffs
-    base_macros["$INTERNALVERSION"] = "104"
-    base_conditionals["$INTERNALVERSION"] = 104
+    macros["$INTERNALVERSION"] = "104"
+    conditionals["$INTERNALVERSION"] = 104
+
+    return macros, conditionals
 
 
-if __name__ == "__main__":
-
-    print("----------------------------------------------------------------------------------")
-    print(" PyQPC " + ' '.join(sys.argv[1:]))
-    print("----------------------------------------------------------------------------------")
-
-    base_macros = {}
-    base_macrosRequired = {}
-    base_conditionals = {}
-
-    unknown_conditionals = []
-
-    all_groups = {}
-    all_projects = {}
-
-    project_type = None
-
-    SetupOSDefines()
-    SetupBaseDefines()  # remove this later
-
+def ParseArgs():
     cmd_parser = argparse.ArgumentParser("Turn VPC projects into VS projects")
 
     # maybe move handling command line parameters to different functions?
@@ -125,8 +108,25 @@ if __name__ == "__main__":
     cmd_parser.add_argument('conditionals', nargs='*', type=str)
     cmd_parser.add_argument('--add', nargs='+', type=str)
     cmd_parser.add_argument('--remove', nargs='+', type=str)
+    cmd_parser.add_argument('--platform', choices=['win32', 'win64', 'linux32', 'linux64'])
 
-    parsed = cmd_parser.parse_args()
+    return cmd_parser.parse_args()
+
+
+if __name__ == "__main__":
+
+    print("----------------------------------------------------------------------------------")
+    print(" PyQPC " + ' '.join(sys.argv[1:]))
+    print("----------------------------------------------------------------------------------")
+
+    all_groups = {}
+    all_projects = {}
+
+    project_type = None
+
+    parsed = ParseArgs()
+
+    base_macros, base_conditionals = SetupDefines(parsed)
 
     # now start the recursion with default.vgc, which i just set to be in the same folder as this
     base_macros["$ROOTDIR"] = os.getcwd() + os.sep
