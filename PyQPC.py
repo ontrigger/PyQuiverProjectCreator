@@ -104,8 +104,10 @@ def ParseArgs():
     cmd_parser.add_argument('-l', '--legacyoptions', action='store_true')
     cmd_parser.add_argument('-w', '--hidewarnings', action='store_true')
     cmd_parser.add_argument('-c', '--checkfiles', action='store_true')
-    cmd_parser.add_argument('--type', choices=["vstudio", "vscode", "make"])
+    cmd_parser.add_argument('-f', '--force', action='store_true', dest='force')
     cmd_parser.add_argument('conditionals', nargs='*', type=str)
+    cmd_parser.add_argument('--type', choices=["vstudio", "vscode", "make"])
+    cmd_parser.add_argument('--name', type=str)
     cmd_parser.add_argument('--add', nargs='+', type=str)
     cmd_parser.add_argument('--remove', nargs='+', type=str)
     cmd_parser.add_argument('--platform', choices=['win32', 'win64', 'linux32', 'linux64'])
@@ -209,7 +211,7 @@ if __name__ == "__main__":
     for project_path in project_script_list:
 
         # only run if the crc check fails or if the user force creates the projects
-        if parser.CRCCheck(base_macros["$ROOTDIR"], project_path) or base.FindCommand("/f"):
+        if parser.CRCCheck(base_macros["$ROOTDIR"], project_path) or parsed.force:
 
             # OPTIMIZATION IDEA:
             # every time you call ReadFile(), add the return onto some dictionary, keys are the absolute path, values are the returns
@@ -226,7 +228,7 @@ if __name__ == "__main__":
 
             parser.MakeCRCFile(os.path.join(base_macros["$ROOTDIR"], project_path), project.crc_list)
 
-            if base.FindCommand("/verbose"):
+            if parsed.verbose:
                 print("Parsed: " + project.name)
 
             # i might need to get a project uuid from this, oof
@@ -243,9 +245,9 @@ if __name__ == "__main__":
 
         project_path_list.append(project_path.rsplit(".", 1)[0])
 
-    if base.FindCommand("/mksln"):
+    if parsed.type == 'vstudio':
         writer.MakeSolutionFile(project_type, project_path_list, base_macros["$ROOTDIR"],
-                                base.FindCommand("/mksln", True))
+                                parsed.name)
 
     # would be cool to add a timer here that would be running on another thread
     # if the cmd option "/benchmark" was specified, though that might be used as a conditional
